@@ -1,101 +1,172 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect, useRef } from "react";
+
+const BicycleGame = () => {
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(10);
+  const [circles, setCircles] = useState<
+    { x: number; y: number; targetX?: number; targetY?: number }[]
+  >([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas: HTMLCanvasElement | null = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let animationFrameId: number;
+    const drawRoad = () => {
+      if (ctx) {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(0, canvas.height / 2 - 40, canvas.width, 80);
+      }
+    };
+    const drawBicycles = () => {
+      if (ctx) {
+        ctx.fillStyle = "#fff";
+        for (let x = 0; x < canvas.width; x += 100) {
+          ctx.beginPath();
+          ctx.arc(x, canvas.height / 2, 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    };
+    const drawCircles = () => {
+      if (ctx) {
+        ctx.fillStyle = "red";
+        circles.forEach((circle) => {
+          if (
+            typeof circle.targetX === "undefined" ||
+            typeof circle.targetY === "undefined"
+          ) {
+            circle.targetX = Math.random() * canvas.width;
+            circle.targetY = Math.random() * canvas.height;
+          }
+
+          // Move circle towards its target point
+          const dx = circle.targetX - circle.x;
+          const dy = circle.targetY - circle.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance > 1) {
+            circle.x += dx / distance;
+            circle.y += dy / distance;
+          } else {
+            // Circle reached its target, generate a new one
+            circle.targetX = Math.random() * canvas.width;
+            circle.targetY = Math.random() * canvas.height;
+          }
+
+          // Keep circles within canvas bounds
+          circle.x = Math.max(15, Math.min(circle.x, canvas.width - 15));
+          circle.y = Math.max(15, Math.min(circle.y, canvas.height - 15));
+
+          // Check if circle entered the road
+          if (
+            circle.y >= canvas.height / 2 - 40 &&
+            circle.y <= canvas.height / 2 + 40
+          ) {
+            // Remove the circle that entered the road
+            circles.splice(circles.indexOf(circle), 1);
+            setLives((prevLives: number) => Math.max(0, prevLives - 1));
+
+            if (lives - 1 === 0) {
+              alert("Game Over! Click OK to restart.");
+              setScore(0);
+              setLives(10);
+              setCircles([]);
+            }
+            return;
+          }
+
+          ctx.beginPath();
+          ctx.arc(circle.x, circle.y, 16, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    };
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawRoad();
+      drawBicycles();
+      drawCircles();
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [circles]);
+
+  useEffect(() => {
+    const addCircle = () => {
+      if (canvasRef.current && circles.length < 10) {
+        let newX, newY;
+        do {
+          newX = Math.random() * canvasRef.current.width;
+          newY = Math.random() * canvasRef.current.height;
+        } while (
+          newY > canvasRef.current.height / 2 - 40 &&
+          newY < canvasRef.current.height / 2 + 40
+        );
+        const newCircle = { x: newX, y: newY };
+        setCircles((prevCircles) => [...prevCircles, newCircle]);
+      }
+    };
+
+    const intervalId = setInterval(addCircle, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [circles]);
+
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    setCircles((prevCircles) =>
+      prevCircles.filter((circle) => {
+        const distance = Math.sqrt((circle.x - x) ** 2 + (circle.y - y) ** 2);
+        if (distance <= 15) {
+          setScore((prevScore) => prevScore + 1);
+          return false;
+        }
+        return true;
+      })
+    );
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+      <h1 className="text-2xl font-bold mb-4">Bicycle Road Game</h1>
+      <p className="mb-2">Score: {score}</p>
+      <p className="mb-4">Lives: {lives}</p>
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={400}
+        onClick={handleCanvasClick}
+        className="border bg-slate-300"
+      />
+      <p className="mt-4 text-center">
+        Click on the red circles to remove them and score points! <br />
         <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+          href="https://twitter.com/yasinelbuz"
           target="_blank"
-          rel="noopener noreferrer"
+          className="text-blue-500"
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
+          @yasinelbuz
         </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </p>
+      {lives === 0 && <p className="text-red-500 font-bold mt-2">Game Over!</p>}
     </div>
   );
-}
+};
+
+export default BicycleGame;
